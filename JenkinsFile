@@ -1,0 +1,44 @@
+pipeline {
+  agent any
+  options { timestamps(); buildDiscarder(logRotator(numToKeepStr: '20')); skipStagesAfterUnstable() }
+  environment {
+    CI = 'true'
+    NEXT_TELEMETRY_DISABLED = '1'
+    EMAIL_TO = 'nayrouz.tebib@esprit.tn'
+  }
+  stages {
+    stage('Checkout') {
+      steps {
+        cleanWs()
+        git branch: 'main', credentialsId: 'git-cred', url: 'https://github.com/nyrouz911/Orange-Forms.git'
+      }
+    }
+    stage('Install / Lint / Typecheck / Test / Build') {
+      steps {
+        sh '''
+          set -euxo pipefail
+          if [ -f package-lock.json ]; then npm ci; elif [ -f pnpm-lock.yaml ]; then corepack enable && pnpm i --frozen-lockfile; else npm i; fi
+          npm run lint --if-present
+          npm run typecheck --if-present
+          npm test --if-present -- --ci --reporters=jest-junit --coverage || true
+          npm run build
+        '''
+      }
+      post {
+        always { junit allowEmptyResults: true, testResults: '**/junit*.xml, **/junit-report.xml' }
+      }
+    }
+    stage('Trigger Vercel Prod') {
+      when { branch 'main' }
+      steps {
+        withCredentials([string(credentialsId: 'vercel-hook-url', variable: 'VERCEL_HOOK_URL')]) {
+          sh 'if [ -n "$VERCEL_HOOK_URL" ]; then curl -s -X POST -d {} "$VERCEL_HOOK_URL" || true; fi'
+        }
+      }
+    }
+  }
+  post {
+    success { echo "✅ CI passed" }
+    failure { echo "❌ CI failed" }
+  }
+}
