@@ -1,6 +1,11 @@
 pipeline {
   agent any
-  options { shell('/bin/bash') timestamps(); buildDiscarder(logRotator(numToKeepStr: '20')); skipStagesAfterUnstable() }
+  options {
+    shell('/bin/bash')
+    timestamps()
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+    skipStagesAfterUnstable()
+  }
   environment {
     CI = 'true'
     NEXT_TELEMETRY_DISABLED = '1'
