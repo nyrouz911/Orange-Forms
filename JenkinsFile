@@ -1,6 +1,14 @@
 pipeline {
   agent any
-  options { timestamps(); buildDiscarder(logRotator(numToKeepStr: '20')); skipStagesAfterUnstable() }
+  options {
+    timestamps()
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+    skipStagesAfterUnstable()
+  }
+
+  parameters {
+    booleanParam(name: 'DEPLOY_TO_PROD', defaultValue: false, description: 'Trigger Vercel Production deploy')
+  }
   environment {
     CI = 'true'
     NEXT_TELEMETRY_DISABLED = '1'
@@ -15,7 +23,7 @@ pipeline {
     }
     stage('Install / Lint / Typecheck / Test / Build') {
       steps {
-        sh '''
+        sh '''#!/usr/bin/env bash
           set -euxo pipefail
           if [ -f package-lock.json ]; then npm ci; elif [ -f pnpm-lock.yaml ]; then corepack enable && pnpm i --frozen-lockfile; else npm i; fi
           npm run lint --if-present
@@ -29,10 +37,25 @@ pipeline {
       }
     }
     stage('Trigger Vercel Prod') {
-      when { branch 'main' }
+     when {
+        allOf {
+          anyOf {
+            expression { return (env.BRANCH_NAME ?: '') == 'main' }
+            expression { return (env.GIT_BRANCH ?: '').endsWith('/main') || (env.GIT_BRANCH ?: '') == 'main' }
+          }
+          expression { return params.DEPLOY_TO_PROD }
+        }
+      }
       steps {
         withCredentials([string(credentialsId: 'vercel-hook-url', variable: 'VERCEL_HOOK_URL')]) {
-          sh 'if [ -n "$VERCEL_HOOK_URL" ]; then curl -s -X POST -d {} "$VERCEL_HOOK_URL" || true; fi'
+          sh '''#!/usr/bin/env bash
+          set -euo pipefail
+          if [[ -n "${VERCEL_HOOK_URL:-}" ]]; then
+            curl -sS -X POST -d '{}' "$VERCEL_HOOK_URL" >/dev/null
+          else
+            echo "VERCEL_HOOK_URL not set; skipping."
+          fi
+          '''
         }
       }
     }
