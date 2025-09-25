@@ -1,0 +1,15 @@
+{
+  "brand": { "title": "Formulaires" },
+  "nav": {
+    "brand": "Forms",
+    "home": "Accueil",
+    "dashboard": "Tableau de bord",
+    "settings": "Paramètres",
+    "myAccount": "Mon compte",
+    "signOut": "Se déconnecter",
+    "signIn": "Se connecter"},
+  "alerts": { "successTitle": "Succès", "successBody": "Vos réponses ont bien été enregistrées. Merci d'avoir soumis le formulaire !" },
+  "form": { "notFound": "Formulaire introuvable" },
+  "buttons": { "signout": "Se déconnecter" },
+  "search": "Rechercher"
+}

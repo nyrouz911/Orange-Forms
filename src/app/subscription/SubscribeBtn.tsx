@@ -1,42 +1,70 @@
+// src/app/subscription/SubscribeBtn.tsx
 "use client";
-import { getStripe } from '@/lib/stripe-client';
-import React from 'react'
-import { useRouter } from 'next/navigation';
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { getStripe } from "@/lib/stripe-client";
 
 type Props = {
-  userId?: string,
-  price: string,
-}
+  price: string;                // Stripe Price ID (recurring)
+  locale?: "en" | "fr" | "pl";  // optional, default 'en'
+};
 
-const SubscribeBtn = ({ userId, price }: Props) => {
+export default function SubscribeBtn({ price, locale = "en" }: Props) {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
-  const handleCheckout = async (price: string) => {
-    if (!userId) {
-      router.push('/login');
-    }
-
+  const handleCheckout = async () => {
     try {
-      const { sessionId } = await fetch('/api/stripe/checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ price }),
-      }).then((res) => res.json());
+      setLoading(true);
 
-      console.log('sessionId:', sessionId);
+      const res = await fetch("/api/stripe/checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ price, quantity: 1, locale }),
+      });
+
+      if (!res.ok) {
+        // If the server returned a JSON error, try to read it
+        let msg = "Failed to create checkout session";
+        try {
+          const j = await res.json();
+          if (j?.error) msg = j.error;
+        } catch {}
+        console.error(msg);
+        setLoading(false);
+        return;
+      }
+
+      const { sessionId } = await res.json();
+      if (!sessionId) {
+        console.error("No sessionId in response");
+        setLoading(false);
+        return;
+      }
+
       const stripe = await getStripe();
-      stripe?.redirectToCheckout({ sessionId });
+      if (!stripe) {
+        console.error("Stripe.js not loaded");
+        setLoading(false);
+        return;
+      }
 
-    } catch (error) {
-      console.error('Error:', error)
+      await stripe.redirectToCheckout({ sessionId });
+    } catch (err) {
+      console.error("Checkout error:", err);
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <button className='underline' onClick={() => handleCheckout(price)}>Upgrade your plan</button>
-  )
+    <button
+      onClick={handleCheckout}
+      disabled={loading}
+      className="bg-[var(--brand-orange-500)] text-black rounded px-3 py-1 hover:opacity-90 disabled:opacity-60"
+      aria-disabled={loading}
+    >
+      {loading ? "Redirecting…" : "Upgrade your plan"}
+    </button>
+  );
 }
-
-export default SubscribeBtn

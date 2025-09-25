@@ -1,62 +1,137 @@
-import React, { ChangeEvent } from 'react'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { FormControl, FormLabel } from '@/components/ui/form';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { QuestionSelectModel } from '@/types/form-types';
-import { FieldOptionSelectModel } from '@/types/form-types';
-import { Label } from '@/components/ui/label';
+// src/forms/FormField.tsx
+'use client';
+
+import * as React from 'react';
+
+type FieldType = 'RadioGroup' | 'Select' | 'Switch' | 'Input' | 'Textarea' | 'ShortText';
+
+type FieldOption = {
+  id: number;
+  text: string | null;
+  value: string | null;
+  questionId: number | null;
+};
+
+export type QuestionWithOptionsModel = {
+  id: number;
+  text: string;
+  fieldType: FieldType;
+  formId: number;
+  fieldOptions: FieldOption[];
+};
 
 type Props = {
-  element: QuestionSelectModel & {
-    fieldOptions: Array<FieldOptionSelectModel>
-  }
-  value: string,
-  onChange: (value?: string | ChangeEvent<HTMLInputElement>) => void
-}
+  element: QuestionWithOptionsModel;
+  value: string | boolean; // RHF-controlled value coming from FillForm
+  onChange: (val: any) => void; // FillForm's universal setter accepts event or value
+};
 
-const FormField = ({ element, value, onChange }: Props) => {
-  if (!element) return null;
+export default function FormField({ element, value, onChange }: Props) {
+  const { id, fieldType, fieldOptions } = element;
 
-  const components = {
-    Input: () => <Input type="text" onChange={onChange} />,
-    Switch: () => <Switch />,
-    Textarea: () => <Textarea />,
-    Select: () => (
-      <Select onValueChange={onChange}>
-        <SelectTrigger>
-          <SelectValue>Select an option</SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {element.fieldOptions.map((option, index) => (
-            <SelectItem key={`${option.text} ${option.value}`} value={`answerId_${option.id}`}>{option.text}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    ),
-    RadioGroup: () => (
-      <RadioGroup onValueChange={onChange}>
-        {element.fieldOptions.map((option, index) => (
-          <div key={`${option.text} ${option.value}`} className='flex items-center space-x-2'>
-            <FormControl>
-              <RadioGroupItem value={`answerId_${option.id}`} id={option?.value?.toString() || `answerId_${option.id}`}>{option.text}</RadioGroupItem>
-            </FormControl>
-            <Label className='text-base'>{option.text}</Label>
-          </div>
+  // Helper for option value shape your submitter expects:
+  // "answerId_<id>" for choice inputs, raw strings for free text, booleans for switch.
+  const optVal = (opt: FieldOption) => `answerId_${opt.id}`;
+
+  if (fieldType === 'Select') {
+    return (
+      <select
+        value={(value as string) ?? ''}
+        onChange={onChange}
+        className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none ring-0 focus:border-[var(--brand-orange-500)]"
+      >
+        {/* Ensure the current value can be '' initially so the control isn't “stuck” */}
+        <option value="" disabled>
+          -- Select an option --
+        </option>
+        {fieldOptions.map((opt) => (
+          <option key={opt.id} value={optVal(opt)}>
+            {opt.text ?? opt.value ?? `Option ${opt.id}`}
+          </option>
         ))}
-      </RadioGroup>
-    )
+      </select>
+    );
   }
 
-  return element.fieldType && components[element.fieldType] ? components[element.fieldType]() : null;
+  if (fieldType === 'RadioGroup') {
+    const name = `q_${id}`;
+    return (
+      <div className="space-y-2">
+        {fieldOptions.map((opt) => {
+          const v = optVal(opt);
+          return (
+            <label key={opt.id} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name={name}
+                value={v}
+                checked={value === v}
+                onChange={onChange}
+                className="h-4 w-4 accent-[var(--brand-orange-500)]"
+              />
+              <span className="text-sm">
+                {opt.text ?? opt.value ?? `Option ${opt.id}`}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (fieldType === 'Switch') {
+  const name = `q_${id}`;
+  const v = String(value ?? '');
+
+  return (
+    <div className="flex items-center gap-6">
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="radio"
+          name={name}
+          value="true"
+          checked={v === 'true'}
+          onChange={onChange}
+          className="h-4 w-4 accent-[var(--brand-orange-500)]"
+        />
+        <span className="text-sm">Yes</span>
+      </label>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="radio"
+          name={name}
+          value="false"
+          checked={v === 'false'}
+          onChange={onChange}
+          className="h-4 w-4 accent-[var(--brand-orange-500)]"
+        />
+        <span className="text-sm">No</span>
+      </label>
+    </div>
+  );
 }
 
-export default FormField
+  if (fieldType === 'Textarea') {
+    return (
+      <textarea
+        value={(value as string) ?? ''}
+        onChange={onChange}
+        rows={4}
+        className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-[var(--brand-orange-500)]"
+        placeholder="Your answer..."
+      />
+    );
+  }
+
+  // Input & ShortText => single-line text
+  return (
+    <input
+      type="text"
+      value={(value as string) ?? ''}
+      onChange={onChange}
+      className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-[var(--brand-orange-500)]"
+      placeholder="Your answer..."
+    />
+  );
+}

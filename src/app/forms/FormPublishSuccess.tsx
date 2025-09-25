@@ -17,7 +17,7 @@ type Props = {
 }
 
 const FormPublishSuccess = (props: Props) => {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000/en';
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(baseUrl + '/forms/' + props.formId)

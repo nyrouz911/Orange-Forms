@@ -1,0 +1,19 @@
+{
+
+  "brand": { "title": "Forms" },
+  "nav": {
+    "brand": "Forms",
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "settings": "Settings",
+    "myAccount": "My account",
+    "signOut": "Sign out",
+    "signIn": "Sign in"
+  },
+  "alerts": { "successTitle": "Success", "successBody": "Your answers were recorded successfully. Thank you for submitting the form!" },
+  "form": { "notFound": "Form not found" },
+  "buttons": { "signout": "Sign out" },
+  "search": "Search"
+  
+}
+ 

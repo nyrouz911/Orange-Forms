@@ -1,0 +1,16 @@
+{
+  "brand": { "title": "Formularze" },
+  "nav": {
+    "brand": "Forms",
+    "home": "Strona główna",
+    "dashboard": "Panel",
+    "settings": "Ustawienia",
+    "myAccount": "Moje konto",
+    "signOut": "Wyloguj",
+    "signIn": "Zaloguj się"
+  },
+  "alerts": { "successTitle": "Sukces", "successBody": "Twoje odpowiedzi zostały zapisane. Dziękujemy za przesłanie formularza!" },
+  "form": { "notFound": "Nie znaleziono formularza" },
+  "buttons": { "signout": "Wyloguj się" },
+  "search": "Szukaj"
+}

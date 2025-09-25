@@ -6,8 +6,11 @@ type Props = {
 
 const ProgressBar = (props: Props) => {
   return (
-    <div className='w-full bg-gray-200 rounded-full h-2.5'>
-      <div className='bg-primary h-2.5 rounded-md' style={{ width: `${props.value}%` }}></div>
+    <div className="w-full bg-neutral-200 rounded-full h-2.5">
+      <div
+        className="h-2.5 rounded-md bg-[var(--brand-orange-500)]"
+        style={{ width: `${props.value}%` }}
+      />
     </div>
   )
 }

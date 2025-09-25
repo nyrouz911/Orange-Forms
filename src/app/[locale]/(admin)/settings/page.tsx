@@ -1,6 +1,6 @@
 import React from 'react'
 import { auth, signIn } from '@/auth';
-import ManageSubscription from './ManageSubscription';
+import ManageSubscription from '@/(admin)/settings/ManageSubscription';
 import { db } from '@/db';
 import { users } from '@/db/schema';
 import { eq } from 'drizzle-orm';

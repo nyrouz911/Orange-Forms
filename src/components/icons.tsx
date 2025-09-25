@@ -1,3 +1,4 @@
+// src/components/icons.ts
 import {
   Library,
   LineChart,
@@ -6,8 +7,10 @@ import {
   Settings,
   UserRoundCog,
   List,
-  type IconNode as LucideIcon
-} from "lucide-react";
+  Plus,
+  BarChart3,
+  type LucideIcon
+} from 'lucide-react';
 
 export type Icon = LucideIcon;
 
@@ -19,4 +22,8 @@ export const Icons = {
   settings: Settings,
   userRoundCog: UserRoundCog,
   list: List,
-}
+  plus: Plus,           
+  barChart: BarChart3    
+} as const;
+
+export type IconName = keyof typeof Icons;

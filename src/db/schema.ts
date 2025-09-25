@@ -17,6 +17,7 @@ export const formElements = pgEnum("field_type", [
   "Input",
   "Textarea",
   "Switch",
+  "ShortText"
 ]);
 
 export const users = pgTable("user", {
@@ -31,7 +32,7 @@ export const users = pgTable("user", {
   stripeCustomerId: text(
     "stripe_customer_id"
   ),
-  subscribed: boolean("subscribed"),
+  subscribed: boolean("subscribed").notNull().default(false),
 });
 
 export const accounts = pgTable(

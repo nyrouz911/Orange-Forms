@@ -1,110 +1,220 @@
+// src/components/Form.tsx
 "use client";
-import React, { useState } from 'react'
-import { FormSelectModel, QuestionSelectModel, FieldOptionSelectModel } from '@/types/form-types'
-import { Form as FormComponent, FormField as ShadcdnFormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
-import { useForm } from "react-hook-form";
-import { Button } from '@/components/ui/button';
-import FormField from './FormField';
-import { publishForm } from '../actions/mutateForm';
-import FormPublishSuccess from './FormPublishSuccess';
-import { useRouter } from 'next/navigation';
 
-type Props = {
-  form: Form,
-  editMode?: boolean
-}
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-type QuestionWithOptionsModel = QuestionSelectModel & {
-  fieldOptions: Array<FieldOptionSelectModel>
-}
+const FIELD_TYPES = ["Input", "Textarea", "RadioGroup", "Select", "Switch", "ShortText"] as const;
+type FieldType = typeof FIELD_TYPES[number];
 
-interface Form extends FormSelectModel {
-  questions: Array<QuestionWithOptionsModel>
-}
+type Question = {
+  id: number;
+  text: string;
+  fieldType: FieldType;
+  formId: number;
+  // optional: fieldOptions if you support them in this editor
+  fieldOptions?: Array<{ id?: number; text: string; value: string }>;
+};
 
-const Form = (props: Props) => {
-  const form = useForm();
-  const router = useRouter();
-  const { editMode } = props;
-  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+export default function Form({
+  form,
+  editMode: editModeProp = false
+}: {
+  form: any;
+  editMode?: boolean;
+}) {
+  // Sanitize initial data
+  const initialQuestions: Question[] = (form?.questions ?? []).map((q: any) => ({
+    id: q.id,
+    text: q.text ?? "",
+    fieldType: (q.fieldType as FieldType) ?? "Input",
+    formId: q.formId ?? form.id,
+    fieldOptions: q.fieldOptions ?? []
+  }));
 
-  const handleDialogChange = (open: boolean) => {
-    setSuccessDialogOpen(open);
+  const [questions, setQuestions] = useState<Question[]>(initialQuestions);
+  const [newQuestionText, setNewQuestionText] = useState("");
+  const [newFieldType, setNewFieldType] = useState<FieldType>("Input");
+  const [isSaving, setIsSaving] = useState(false);
+  const [editMode, setEditMode] = useState(!!editModeProp);
+
+  async function reloadFromServer() {
+    const res = await fetch(`/api/form/${form.id}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to reload form");
+    const data = await res.json();
+    const fresh = (data.form?.questions ?? []).map((q: any) => ({
+      id: q.id,
+      text: q.text ?? "",
+      fieldType: (q.fieldType as FieldType) ?? "Input",
+      formId: q.formId ?? form.id,
+      fieldOptions: q.fieldOptions ?? []
+    })) as Question[];
+    setQuestions(fresh);
   }
 
-  const onSubmit = async (data: any) => {
-    console.log(data);
-    if (editMode) {
-      await publishForm(props.form.id);
-      setSuccessDialogOpen(true);
-    } else {
-      let answers = [];
-      for (const [questionId, value] of Object.entries(data)) {
-        const id = parseInt(questionId.replace('question_', ''));
-        let fieldOptionsId = null;
-        let textValue = null;
+  async function pushQuestions(fullList: Question[]) {
+    setIsSaving(true);
+    try {
+      const payload = {
+        name: form.name ?? undefined,
+        description: form.description ?? undefined,
+        questions: fullList.map(q => ({
+          id: q.id, // server will use id to decide update vs insert
+          text: q.text,
+          fieldType: q.fieldType,
+          // include options if you support them in UI
+          fieldOptions: q.fieldOptions?.map(o => ({ text: o.text, value: o.value })) ?? []
+        }))
+      };
 
-        if (typeof value == "string" && value.includes('answerId_')) {
-          fieldOptionsId = parseInt(value.replace('answerId_', ''));
-        } else {
-          textValue = value as string;
-        }
-
-        answers.push({
-          questionId: id,
-          fieldOptionsId,
-          value: textValue
-        })
-      }
-
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-
-      const response = await fetch(`${baseUrl}/api/form/new`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ formId: props.form.id, answers })
+      const res = await fetch(`/api/form/${form.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       });
-      if (response.status === 200) {
-        router.push(`/forms/${props.form.id}/success`);
-      } else {
-        console.error('Error submitting form');
-        alert('Error submitting form. Please try again later');
+      if (!res.ok) {
+        const err = await res.text().catch(() => "");
+        throw new Error(err || "Failed to save");
       }
+
+      // Re-fetch to get fresh IDs for newly inserted rows
+      await reloadFromServer();
+    } finally {
+      setIsSaving(false);
     }
   }
 
+  async function handleAdd() {
+    if (!newQuestionText.trim()) return;
+    // Optimistic local add with a temporary id (negative)
+    const tempId = -(Date.now());
+    const next: Question[] = [
+      ...questions,
+      {
+        id: tempId,
+        text: newQuestionText.trim(),
+        fieldType: newFieldType,
+        formId: form.id,
+        fieldOptions: []
+      }
+    ];
+    setQuestions(next);
+    setNewQuestionText("");
+    await pushQuestions(next);
+  }
+
+  async function handleEdit(id: number, text: string) {
+    const next = questions.map(q => (q.id === id ? { ...q, text } : q));
+    setQuestions(next);
+    await pushQuestions(next);
+  }
+
+  async function handleChangeType(id: number, fieldType: FieldType) {
+    const next = questions.map(q => (q.id === id ? { ...q, fieldType } : q));
+    setQuestions(next);
+    await pushQuestions(next);
+  }
+
+  async function handleDelete(id: number) {
+    const next = questions.filter(q => q.id !== id);
+    setQuestions(next);
+    await pushQuestions(next);
+  }
 
   return (
-    <div className='text-center'>
-      <h1 className='text-lg font-bold py-3'>{props.form.name}</h1>
-      <h3 className='text-md'>{props.form.description}</h3>
-      <FormComponent {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className='grid w-full max-w-3xl items-center gap-6 my-4 text-left'>
-          {props.form.questions.map((question: QuestionWithOptionsModel, index: number) => {
-            return (
-              <ShadcdnFormField
-                control={form.control}
-                name={`question_${question.id}`}
-                key={`${question.text}_${index}`}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className='text-base mt-3'>{index + 1}.{" "}{question.text}</FormLabel>
-                    <FormControl>
-                      <FormField element={question} key={index} value={field.value} onChange={field.onChange} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            )
-          })}
-          <Button type='submit'>{editMode ? "Publish" : "Submit"}</Button>
-        </form>
-      </FormComponent>
-      <FormPublishSuccess formId={props.form.id} open={successDialogOpen} onOpenChange={handleDialogChange} />
-    </div>
-  )
-}
+    <div className="space-y-4">
+      {/* Mode toggle */}
+      <button
+        onClick={() => setEditMode(!editMode)}
+        className="mb-2 inline-flex items-center rounded-md border border-[var(--brand-orange-500)] px-4 py-2 text-sm font-medium text-[var(--brand-orange-500)] hover:bg-[var(--brand-orange-500)] hover:text-white transition"
+      >
+        {editMode ? "Switch to View Mode" : "Switch to Edit Mode"}
+      </button>
 
-export default Form
+      {/* Add new question */}
+      {editMode && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Add a question</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-[1fr_minmax(180px,240px)_auto]">
+            <input
+              type="text"
+              value={newQuestionText}
+              onChange={(e) => setNewQuestionText(e.target.value)}
+              placeholder="New question text"
+              className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-orange-500)] focus-visible:ring-offset-2"
+              aria-label="New question text"
+            />
+
+            <select
+              value={newFieldType}
+              onChange={(e) => setNewFieldType(e.target.value as FieldType)}
+              className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-orange-500)] focus-visible:ring-offset-2"
+              aria-label="Field type"
+            >
+              {FIELD_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={handleAdd}
+              disabled={isSaving || !newQuestionText.trim()}
+              className="inline-flex items-center rounded-md bg-[var(--brand-orange-500)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              ＋ Add Question
+            </button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Questions list */}
+      <div className="space-y-3">
+        {questions.map((q) => (
+          <Card key={q.id}>
+            <CardContent className="pt-5 grid gap-3 sm:grid-cols-[1fr_minmax(180px,240px)_auto]">
+              <input
+                value={q.text}
+                onChange={(e) => handleEdit(q.id, e.target.value)}
+                disabled={!editMode || isSaving}
+                className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-orange-500)] focus-visible:ring-offset-2 disabled:opacity-60"
+                aria-label="Question text"
+              />
+
+              <select
+                value={q.fieldType}
+                onChange={(e) => handleChangeType(q.id, e.target.value as FieldType)}
+                disabled={!editMode || isSaving}
+                className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-orange-500)] focus-visible:ring-offset-2 disabled:opacity-60"
+                aria-label="Question type"
+              >
+                {FIELD_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+
+              {editMode && (
+                <button
+                  onClick={() => handleDelete(q.id)}
+                  disabled={isSaving}
+                  className="justify-self-start inline-flex items-center rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100 disabled:opacity-50 transition"
+                >
+                  ✕ Delete
+                </button>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {isSaving && (
+        <p className="text-sm text-neutral-500">Saving…</p>
+      )}
+    </div>
+  );
+}

@@ -9,6 +9,7 @@ type Props = {}
 const page = async (props: Props) => {
   const forms: InferSelectModel<typeof dbForms>[] = await getUserForms();
 
+
   return (
     <>
       <FormsList forms={forms} /></>

@@ -1,5 +1,7 @@
+"use client";
 import React from 'react'
 import { forms } from '@/db/schema';
+import { useParams } from 'next/navigation';
 import { InferSelectModel } from 'drizzle-orm';
 import {
   Card,
@@ -19,6 +21,7 @@ type Props = {
 }
 
 const FormsList = (props: Props) => {
+  const { locale } = useParams();
   return (
     <div className='grid grid-cols1 md:grid-cols-3 m-5 p-4 gap-4'>{props.forms.map((form: Form) => (<Card key={form.id} className='max-w-[350px] flex flex-col'>
       <CardHeader className='flex-1'>
@@ -30,9 +33,9 @@ const FormsList = (props: Props) => {
         </CardDescription>
       </CardHeader>
       <CardFooter>
-        <Link className="w-full" href={`/forms/edit/${form.id}`}>
-          <Button className='w-full'>View</Button>
-        </Link>
+        <Link className="w-full" href={`/${locale}/forms/edit/${form.id}`}>
+  <Button className='w-full'>View</Button>
+</Link>
       </CardFooter>
     </Card>))}</div>
   )

@@ -2,8 +2,8 @@ import React from 'react'
 import { getUserForms } from '@/app/actions/getUserForms'
 import { InferSelectModel } from 'drizzle-orm'
 import { forms } from '@/db/schema'
-import FormsPicker from './FormsPicker'
-import ResultsDisplay from './ResultsDisplay'
+import FormsPicker from '../../../(admin)/results/FormsPicker'
+import ResultsDisplay from '../../../(admin)/results/ResultsDisplay'
 
 type Props = {}
 
