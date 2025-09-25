@@ -31,15 +31,16 @@ const ResultsDisplay = async ({ formId }: Props) => {
 
   if (!form) return null;
   if (!form.submissions) return <p>No submissions on this form yet!</p>;
-  console.log('form', form);
+  // console.log('form', form);
   return (
-    <div>
-      <Table
-        data={form.submissions}
-        columns={form.questions}
-      />
-    </div>
-  )
+  <div>
+    <Table
+      data={form.submissions}
+      columns={form.questions}
+      fileName={form.name || `form_${form.id}_results`}
+    />
+  </div>
+);
 }
 
 export default ResultsDisplay

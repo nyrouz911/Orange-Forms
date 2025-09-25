@@ -14,20 +14,12 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
+import { Button } from "@/components/ui/button";
 
 type FieldOption = InferSelectModel<typeof fieldOptionsTable>;
-
-type Answer = InferSelectModel<typeof answersTable> & {
-  fieldOption?: FieldOption | null;
-};
-
-type Question = InferSelectModel<typeof questionsTable> & {
-  fieldOptions: FieldOption[];
-};
-
-type FormSubmission = InferSelectModel<typeof formSubmissionsTable> & {
-  answers: Answer[];
-};
+type Answer = InferSelectModel<typeof answersTable> & { fieldOption?: FieldOption | null };
+type Question = InferSelectModel<typeof questionsTable> & { fieldOptions: FieldOption[] };
+type FormSubmission = InferSelectModel<typeof formSubmissionsTable> & { answers: Answer[] };
 
 export type Form =
   | (InferSelectModel<typeof forms> & {
@@ -39,37 +31,72 @@ export type Form =
 interface TableProps {
   data: FormSubmission[];
   columns: Question[];
+  /** Optional file name (no extension). Defaults to "form_results". */
+  fileName?: string;
 }
 
 const columnHelper = createColumnHelper<any>();
 
-export function Table({ data, columns: questionDefs }: TableProps) {
-  // Build columns (id + one column per question)
+export function Table({ data, columns: questionDefs, fileName = "form_results" }: TableProps) {
+  // Build columns (one column per question)
   const columns = React.useMemo(
-  () =>
-    questionDefs.map((question) =>
-      columnHelper.accessor(
-        (row: FormSubmission) => {
-          const ans = (row.answers ?? []).find(a => a?.questionId === question.id);
-          return ans?.fieldOption?.text ?? ans?.value ?? "—";
-        },
-        {
-          id: question.id.toString(),
-          header: () => question.text ?? `Question ${question.id}`,
-          cell: (info) => info.renderValue(),
-        }
-      )
-    ),
-  [questionDefs]
-);
+    () =>
+      questionDefs.map((question) =>
+        columnHelper.accessor(
+          (row: FormSubmission) => {
+            const ans = (row.answers ?? []).find((a) => a?.questionId === question.id);
+            return ans?.fieldOption?.text ?? ans?.value ?? "—";
+          },
+          {
+            id: question.id.toString(),
+            header: () => question.text ?? `Question ${question.id}`,
+            cell: (info) => info.renderValue(),
+          }
+        )
+      ),
+    [questionDefs]
+  );
+
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
   });
 
+  // Export to Excel
+  async function handleExportExcel() {
+    // Lazy-load xlsx (keeps bundle smaller)
+    const XLSX = await import("xlsx");
+
+    // Build a flat array of objects: { "Question 1": "Answer", "Question 2": "Answer", ... }
+    const headers = questionDefs.map((q) => q.text ?? `Question ${q.id}`);
+    const rows = data.map((submission) => {
+      const row: Record<string, string> = {};
+      questionDefs.forEach((q, idx) => {
+        const ans = (submission.answers ?? []).find((a) => a?.questionId === q.id);
+        row[headers[idx]] = (ans?.fieldOption?.text ?? ans?.value ?? "—") as string;
+      });
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Results");
+    XLSX.writeFile(wb, `${fileName}.xlsx`);
+  }
+
   return (
     <div className="p-2 mt-4">
+      {/* Toolbar */}
+      <div className="mb-3 flex items-center justify-end">
+        <Button
+          onClick={handleExportExcel}
+          className="bg-[var(--brand-orange-500)] hover:opacity-90"
+        >
+          Export to Excel
+        </Button>
+      </div>
+
       <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="min-w-full text-sm">
           <thead className="bg-neutral-50">

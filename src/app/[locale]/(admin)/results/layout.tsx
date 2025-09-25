@@ -12,7 +12,6 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       { title: 'My Forms',  href: '/view-forms', icon: 'library' },
       { title: 'Results',   href: '/results',    icon: 'list' },
       { title: 'Analytics', href: '/analytics',  icon: 'lineChart' },
-      { title: 'Charts',    href: '/charts',     icon: 'pieChart' },
       { title: 'Settings',  href: '/settings',   icon: 'settings' },
     ];
   
