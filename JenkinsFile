@@ -61,7 +61,77 @@ pipeline {
     }
   }
   post {
-    success { echo "✅ CI passed" }
-    failure { echo "❌ CI failed" }
+    success {
+      script {
+        emailext(
+          to: env.EMAIL_TO,
+          subject: "[${env.JOB_NAME}] #${env.BUILD_NUMBER} ✅ SUCCESS",
+          mimeType: 'text/html',
+          attachLog: true,
+          body: """
+            <h3>Build Succeeded</h3>
+            <ul>
+              <li><b>Job:</b> ${env.JOB_NAME}</li>
+              <li><b>Build #:</b> ${env.BUILD_NUMBER}</li>
+              <li><b>Branch:</b> ${env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'n/a'}</li>
+              <li><b>URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></li>
+            </ul>
+          """
+        )
+      }
+      echo "✅ CI passed"
+    }
+
+    unstable {
+      script {
+        emailext(
+          to: env.EMAIL_TO,
+          subject: "[${env.JOB_NAME}] #${env.BUILD_NUMBER} ⚠️ UNSTABLE",
+          mimeType: 'text/html',
+          attachLog: true,
+          body: """
+            <h3>Build Unstable</h3>
+            <p>Some steps failed or tests are unstable.</p>
+            <p><a href="${env.BUILD_URL}">Open build</a></p>
+          """
+        )
+      }
+    }
+
+    failure {
+      script {
+        emailext(
+          to: env.EMAIL_TO,
+          subject: "[${env.JOB_NAME}] #${env.BUILD_NUMBER} ❌ FAILURE",
+          mimeType: 'text/html',
+          attachLog: true,
+          body: """
+            <h3>Build Failed</h3>
+            <ul>
+              <li><b>Job:</b> ${env.JOB_NAME}</li>
+              <li><b>Build #:</b> ${env.BUILD_NUMBER}</li>
+              <li><b>Branch:</b> ${env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'n/a'}</li>
+              <li><b>URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></li>
+            </ul>
+          """
+        )
+      }
+      echo "❌ CI failed"
+    }
+
+    aborted {
+      script {
+        emailext(
+          to: env.EMAIL_TO,
+          subject: "[${env.JOB_NAME}] #${env.BUILD_NUMBER} ⏹ ABORTED",
+          mimeType: 'text/html',
+          attachLog: true,
+          body: """
+            <h3>Build Aborted</h3>
+            <p><a href="${env.BUILD_URL}">Open build</a></p>
+          """
+        )
+      }
+    }
   }
 }
