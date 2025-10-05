@@ -20,7 +20,7 @@ const FormPublishSuccess = (props: Props) => {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000/en';
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(baseUrl + '/forms/' + props.formId)
+    navigator.clipboard.writeText(baseUrl + '/en/forms/' + props.formId)
       .then(() => alert("Copied to clipboard"))
       .catch((error) => alert("Failed to copy to clipboard"));
   }
