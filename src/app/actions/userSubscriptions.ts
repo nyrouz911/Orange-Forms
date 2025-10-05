@@ -4,7 +4,8 @@ import { eq } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 
 export async function createSubscription({ stripeCustomerId }: { stripeCustomerId: string; }) {
-  const result = await db
+  console.log("readeable test")
+    const result = await db
     .update(users)
     .set({ subscribed: sql`TRUE` })
     .where(eq(users.stripeCustomerId, stripeCustomerId));

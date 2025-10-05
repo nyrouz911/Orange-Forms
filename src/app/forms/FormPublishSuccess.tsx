@@ -41,7 +41,7 @@ const FormPublishSuccess = (props: Props) => {
               className="w-full outline-none bg-transparent" type="text"
               placeholder="link"
               disabled
-              value={`${baseUrl}/forms/${props.formId}`}
+              value={`${baseUrl}/en/forms/${props.formId}`}
             />
             <Button onClick={copyToClipboard}>Copy</Button>
           </div>

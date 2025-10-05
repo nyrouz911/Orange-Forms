@@ -1,5 +1,9 @@
 import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
+import { db } from "@/db";
+import { users } from "@/db/schema";
+import { sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { createSubscription, deleteSubscription } from "@/app/actions/userSubscriptions";
 
 const relevantEvents = new Set([
