@@ -1,5 +1,6 @@
 pipeline {
   agent any
+
   options {
     timestamps()
     buildDiscarder(logRotator(numToKeepStr: '20'))
@@ -9,11 +10,16 @@ pipeline {
   parameters {
     booleanParam(name: 'DEPLOY_TO_PROD', defaultValue: false, description: 'Trigger Vercel Production deploy')
   }
+
   environment {
     CI = 'true'
     NEXT_TELEMETRY_DISABLED = '1'
-    EMAIL_TO = 'nayrouz.tebib@esprit.tn'
+
+    EMAIL_TO   = 'nayrouz.tebib@esprit.tn'
+    
+    EMAIL_FROM = 'nay@gmail.com'
   }
+
   stages {
     stage('Checkout') {
       steps {
@@ -21,104 +27,195 @@ pipeline {
         git branch: 'main', credentialsId: 'git-cred', url: 'https://github.com/nyrouz911/Orange-Forms.git'
       }
     }
+
     stage('Install / Lint / Typecheck / Test / Build') {
       steps {
         sh '''#!/usr/bin/env bash
           set -euxo pipefail
-          if [ -f package-lock.json ]; then npm ci; elif [ -f pnpm-lock.yaml ]; then corepack enable && pnpm i --frozen-lockfile; else npm i; fi
+          if [ -f package-lock.json ]; then
+            npm ci
+          elif [ -f pnpm-lock.yaml ]; then
+            corepack enable && pnpm i --frozen-lockfile
+          else
+            npm i
+          fi
+
           npm run lint --if-present
           npm run typecheck --if-present
+
+          # run tests if present; don't fail pipeline due to missing jest
           npm test --if-present -- --ci --reporters=jest-junit --coverage || true
+
           npm run build
         '''
       }
       post {
-        always { junit allowEmptyResults: true, testResults: '**/junit*.xml, **/junit-report.xml' }
+        always {
+         
+          junit allowEmptyResults: true, testResults: '**/junit*.xml, **/junit-report.xml'
+        }
       }
     }
+
     stage('Diag') {
-  steps {
-    echo "BRANCH_NAME=${env.BRANCH_NAME}, GIT_BRANCH=${env.GIT_BRANCH}, DEPLOY_TO_PROD=${params.DEPLOY_TO_PROD}"
-  }
-}
+      steps {
+        echo "BRANCH_NAME=${env.BRANCH_NAME}, GIT_BRANCH=${env.GIT_BRANCH}, DEPLOY_TO_PROD=${params.DEPLOY_TO_PROD}"
+      }
+    }
+
     stage('Trigger Vercel Prod') {
-  when {
-    allOf {
-      anyOf {
-        expression { (env.BRANCH_NAME ?: '') == 'main' }
-        expression { (env.GIT_BRANCH ?: '').endsWith('/main') || (env.GIT_BRANCH ?: '') == 'main' }
+      when {
+        allOf {
+          anyOf {
+            expression { (env.BRANCH_NAME ?: '') == 'main' }
+            expression { (env.GIT_BRANCH ?: '').endsWith('/main') || (env.GIT_BRANCH ?: '') == 'main' }
+          }
+          expression { params.DEPLOY_TO_PROD }
+        }
       }
-      expression { params.DEPLOY_TO_PROD }
-    }
-  }
-  steps {
-    echo "Deploying to Vercel (main + DEPLOY_TO_PROD=true)"
-    withCredentials([string(credentialsId: 'vercel-hook-url', variable: 'VERCEL_HOOK_URL')]) {
-      sh '''#!/usr/bin/env bash
-        set -euo pipefail
-        if [[ -z "${VERCEL_HOOK_URL:-}" ]]; then
-          echo "VERCEL_HOOK_URL not set; skipping."
-          exit 0
-        fi
-        curl -sS -X POST -d '{}' "$VERCEL_HOOK_URL" || { echo "Vercel hook call failed"; exit 1; }
-      '''
-    }
-  }
-}
-  post {
-  success {
-    script {
-      echo "[email] sending SUCCESS mail to ${env.EMAIL_TO}"
-      try {
-        emailext(
-          to: env.EMAIL_TO,
-          subject: "[${env.JOB_NAME}] #${env.BUILD_NUMBER} ✅ SUCCESS",
-          mimeType: 'text/html',
-          attachLog: true,
-          body: """
-            <h3>Build Succeeded</h3>
-            <ul>
-              <li><b>Job:</b> ${env.JOB_NAME}</li>
-              <li><b>Build #:</b> ${env.BUILD_NUMBER}</li>
-              <li><b>Branch:</b> ${env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'n/a'}</li>
-              <li><b>URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></li>
-            </ul>
-          """
-        )
-      } catch (e) {
-        echo "[email] FAILED to send: ${e}"
+      steps {
+        echo "Deploying to Vercel (main + DEPLOY_TO_PROD=true)"
+        withCredentials([string(credentialsId: 'vercel-hook-url', variable: 'VERCEL_HOOK_URL')]) {
+          sh '''#!/usr/bin/env bash
+            set -euo pipefail
+            if [[ -z "${VERCEL_HOOK_URL:-}" ]]; then
+              echo "VERCEL_HOOK_URL not set; skipping."
+              exit 0
+            fi
+            
+            curl -sS -X POST -H "Content-Type: application/json" -d '{}' "$VERCEL_HOOK_URL" || {
+              echo "Vercel hook call failed"; exit 1;
+            }
+          '''
+        }
       }
     }
-    echo "✅ CI passed"
   }
 
-  failure {
-    script {
-      echo "[email] sending FAILURE mail to ${env.EMAIL_TO}"
-      try {
-        emailext(
-          to: env.EMAIL_TO,
-          subject: "[${env.JOB_NAME}] #${env.BUILD_NUMBER} ❌ FAILURE",
-          mimeType: 'text/html',
-          attachLog: true,
-          body: """
-            <h3>Build Failed</h3>
-            <ul>
-              <li><b>Job:</b> ${env.JOB_NAME}</li>
-              <li><b>Build #:</b> ${env.BUILD_NUMBER}</li>
-              <li><b>Branch:</b> ${env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'n/a'}</li>
-              <li><b>URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></li>
-            </ul>
-          """
-        )
-      } catch (e) {
-        echo "[email] FAILED to send: ${e}"
+  post {
+    success {
+      script {
+        echo "[email] sending SUCCESS mail to ${env.EMAIL_TO}"
+        try {
+          emailext(
+            from: env.EMAIL_FROM,
+            to:   env.EMAIL_TO,
+            subject: "[${env.JOB_NAME}] #${env.BUILD_NUMBER} ✅ SUCCESS",
+            mimeType: 'text/html',
+            attachLog: true,
+            body: """
+              <h3>Build Succeeded</h3>
+              <ul>
+                <li><b>Job:</b> ${env.JOB_NAME}</li>
+                <li><b>Build #:</b> ${env.BUILD_NUMBER}</li>
+                <li><b>Branch:</b> ${env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'n/a'}</li>
+                <li><b>URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></li>
+              </ul>
+            """
+          )
+        } catch (e) {
+          echo "[email] emailext failed: ${e} — trying basic mail()..."
+          mail(
+            from:    env.EMAIL_FROM,
+            to:      env.EMAIL_TO,
+            subject: "[${env.JOB_NAME}] #${env.BUILD_NUMBER} ✅ SUCCESS",
+            body:    "Build succeeded.\n${env.BUILD_URL}"
+          )
+        }
+      }
+      echo "✅ CI passed"
+    }
+
+    failure {
+      script {
+        echo "[email] sending FAILURE mail to ${env.EMAIL_TO}"
+        try {
+          emailext(
+            from: env.EMAIL_FROM,
+            to:   env.EMAIL_TO,
+            subject: "[${env.JOB_NAME}] #${env.BUILD_NUMBER} ❌ FAILURE",
+            mimeType: 'text/html',
+            attachLog: true,
+            body: """
+              <h3>Build Failed</h3>
+              <ul>
+                <li><b>Job:</b> ${env.JOB_NAME}</li>
+                <li><b>Build #:</b> ${env.BUILD_NUMBER}</li>
+                <li><b>Branch:</b> ${env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'n/a'}</li>
+                <li><b>URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></li>
+              </ul>
+            """
+          )
+        } catch (e) {
+          echo "[email] emailext failed: ${e} — trying basic mail()..."
+          mail(
+            from:    env.EMAIL_FROM,
+            to:      env.EMAIL_TO,
+            subject: "[${env.JOB_NAME}] #${env.BUILD_NUMBER} ❌ FAILURE",
+            body:    "Build failed.\n${env.BUILD_URL}"
+          )
+        }
+      }
+      echo "❌ CI failed"
+    }
+
+    unstable {
+      script {
+        echo "[email] sending UNSTABLE mail to ${env.EMAIL_TO}"
+        try {
+          emailext(
+            from: env.EMAIL_FROM,
+            to:   env.EMAIL_TO,
+            subject: "[${env.JOB_NAME}] #${env.BUILD_NUMBER} ⚠️ UNSTABLE",
+            mimeType: 'text/html',
+            attachLog: true,
+            body: """
+              <h3>Build Unstable</h3>
+              <p>Some steps failed or tests are unstable.</p>
+              <p><a href="${env.BUILD_URL}">Open build</a></p>
+            """
+          )
+        } catch (e) {
+          echo "[email] emailext failed: ${e} — trying basic mail()..."
+          mail(
+            from:    env.EMAIL_FROM,
+            to:      env.EMAIL_TO,
+            subject: "[${env.JOB_NAME}] #${env.BUILD_NUMBER} ⚠️ UNSTABLE",
+            body:    "Build unstable.\n${env.BUILD_URL}"
+          )
+        }
       }
     }
-    echo "❌ CI failed"
-  }
-}
-always {
-    echo "Build URL: ${env.BUILD_URL}"
+
+    aborted {
+      script {
+        echo "[email] sending ABORTED mail to ${env.EMAIL_TO}"
+        try {
+          emailext(
+            from: env.EMAIL_FROM,
+            to:   env.EMAIL_TO,
+            subject: "[${env.JOB_NAME}] #${env.BUILD_NUMBER} ⏹ ABORTED",
+            mimeType: 'text/html',
+            attachLog: true,
+            body: """
+              <h3>Build Aborted</h3>
+              <p><a href="${env.BUILD_URL}">Open build</a></p>
+            """
+          )
+        } catch (e) {
+          echo "[email] emailext failed: ${e} — trying basic mail()..."
+          mail(
+            from:    env.EMAIL_FROM,
+            to:      env.EMAIL_TO,
+            subject: "[${env.JOB_NAME}] #${env.BUILD_NUMBER} ⏹ ABORTED",
+            body:    "Build aborted.\n${env.BUILD_URL}"
+          )
+        }
+      }
+    }
+
+    always {
+      echo "Build URL: ${env.BUILD_URL}"
+    }
   }
 }
